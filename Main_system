@@ -1,0 +1,197 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 01/24/2025 02:01:22 AM
+// Design Name: 
+// Module Name: main_2
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module main_2(
+    input wire clk,                               // clock signal for sychronization
+    input wire reset, 
+    input wire sensor_entrance1,sensor_entrance2, // sensor input for outer and inner side of entrance
+    input wire mode,                              // mode selection  mode=1 entrance mode, mode=0 exit mode 
+    input wire [15:0] password_1,otp_1,           // password_1 is the user input and otp_1 is input from the otp generator
+    input wire [1:0] decision,                    // manual decision for gate opening for special circumstances
+    input wire [15:0] car_no,                     // user entry for car no. used in exit mode
+    input wire [15:0] data_car,                   // input from the database to check registered car no
+    output reg gate_ent,                          // gate entrance signal to open and close
+    output wire green_led,                        // green light control signal
+    output wire red_led                           // red light control signal
+    );
+    parameter IDLE = 3'b000, WAIT_PASSWORD = 3'b001, WRONG_PASS = 3'b010, RIGHT_PASS = 3'b011, STOP = 3'b100;
+    
+    reg[2:0]  current_state,next_state;
+    reg[31:0] stop_wait;                         // stop counter for to hold STOP state
+    reg[31:0] counter_wait;                      // waiting counter for password generation and input
+    reg red_tmp,green_tmp;                        
+    reg pass_count;
+        
+    always @(posedge clk or negedge reset)
+    begin
+    if(~reset)
+    current_state = IDLE;                        // on reseting the first state is IDLE state
+    else
+    current_state = next_state;                  // or no change in state it remains in state as it was before
+    end
+    
+    always @(posedge clk or negedge reset)
+    begin 
+    if (~reset)
+    counter_wait <= 0;                           // on resetting the wait counter is returned to 0  
+    else begin if(current_state == WAIT_PASSWORD)
+            counter_wait <= counter_wait +1;             // in WAIT_PASSWORD state wait counter starts counting
+            else                                         
+            counter_wait <=0;                            // in any other STATE wait counter returns to zero
+        end
+    end
+    
+always @(posedge clk or negedge reset)
+    begin 
+    if (~reset)
+    stop_wait <= 0;                           // on resetting the wait counter is returned to 0  
+        else begin if(current_state == STOP)
+            stop_wait <= stop_wait +1;             // in WAIT_PASSWORD state wait counter starts counting
+        else                                         
+        stop_wait <=0;                            // in any other STATE wait counter returns to zero
+        end
+    end
+    
+    
+    always @(*)
+    begin 
+    case (current_state)                                          // checking current state of system     
+    IDLE: begin 
+            if(sensor_entrance1==1 && sensor_entrance2==0)        // car is in outer part of entrance
+                next_state= WAIT_PASSWORD;                        //state changes to WAIT_PASSWORD
+            else
+                next_state=IDLE;                                  // or remains in IDLE state
+            end
+            
+    WAIT_PASSWORD: begin
+            if(counter_wait <=3)                                // waits for 3 clock cycles
+            next_state = WAIT_PASSWORD;                          
+            else
+            begin
+            if (mode==1)                           //FOR ENTRANCE MODE 
+                begin
+                if(password_1==otp_1)              // Check user input with otp
+                next_state = RIGHT_PASS;           // if matches state changes to RIGHT_PASS 
+                else
+                begin
+                next_state = WRONG_PASS;            // else change state to WRONG_PASS
+                                                   
+                pass_count = 1;                     // increase password counter by 1
+                end
+                end
+            else begin                           // EXIT MODE 
+               if(car_no==data_car)              // match user input car_no with car no stored in database
+               begin
+                 if(password_1==otp_1)           // match the user input with otp
+                                            
+                 next_state =RIGHT_PASS;         // if matches change state to RIGHT_PASS 
+                 else begin                     
+                 next_state = WRONG_PASS;        // else state to WRONG_PASS
+                 pass_count =1;                  // increse pass count to 1
+                 
+                 end
+               end
+             end
+           end
+            end
+            
+    WRONG_PASS: begin
+        if(pass_count <=4)                  // if password attempt is less than 5
+            begin
+             if(password_1==otp_1)          // check again
+             next_state = RIGHT_PASS;       // if matches state to RIDHT_PASS
+             else                           
+             next_state = WRONG_PASS;       // if not change state to WRONG_PASS again
+             pass_count = pass_count + 1;   // and pass counter by 1
+             end
+        else                                // if password attempt is over 4
+            begin 
+            next_state= STOP;               // change state to STOP
+            end
+        end
+     RIGHT_PASS: begin
+             if(sensor_entrance1==1 && sensor_entrance2==0)         // if Car is at entrance 
+             begin
+             gate_ent=1;                                     // open the gate
+             next_state = RIGHT_PASS;                               // and change state to right pass untill car passes through the gate
+             end
+             else if(sensor_entrance1==0 && sensor_entrance2 == 1)    // car is inside the gate
+             begin
+             gate_ent=0;                                              // close the gate
+             next_state = STOP;                                       // return the system to IDLE
+             end
+             else
+             next_state = RIGHT_PASS;                                // system remain in RIGHT_PASS state until car passes through the entrances
+             end
+     STOP: begin
+     if(stop_wait<=3) begin
+      next_state=STOP;
+      stop_wait=stop_wait+1;
+      end
+      else begin
+            if(decision==2'b01)                                     // Manual decision to recheck password 
+            begin
+             pass_count=0;
+             next_state = WAIT_PASSWORD;
+             end
+            else if(decision==2'b10)                              // manual decision to open gate  
+              next_state=RIGHT_PASS;
+            else if (decision==2'b00)                            // decision is by default at 2'b00 input
+             next_state = IDLE;
+            else 
+             next_state =STOP;
+            end
+             end
+    default: next_state = IDLE;                                // return to IDLE state bt default
+             endcase
+             end
+             // LEDs and output, change the period of blinking LEDs here
+             always @(posedge clk) begin 
+             case(current_state)
+             IDLE: begin
+             green_tmp = 1'b0;                // both light are off
+             red_tmp = 1'b0;
+             end
+             WAIT_PASSWORD: begin             // red light is on signalling to wait
+             green_tmp = 1'b0;
+             red_tmp = 1'b1;
+             end
+             WRONG_PASS: begin
+             green_tmp = 1'b0;                // red light blinks signalling error
+             red_tmp = ~red_tmp;               
+             end
+             RIGHT_PASS: begin
+             green_tmp = ~green_tmp;          // green light blinks signalling correct password
+             red_tmp = 1'b0;
+             end
+             STOP: begin
+             green_tmp = 1'b0;                // red light blinking again signalling signal the next car to stop  
+             red_tmp = ~red_tmp;
+             end
+             endcase
+             end
+             assign red_led = red_tmp  ;
+             assign green_led = green_tmp;
+            
+    
+endmodule
+
