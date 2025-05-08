@@ -1,0 +1,125 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 01/24/2025 03:43:21 PM
+// Design Name: 
+// Module Name: TB_CarPark
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module TB_CarPark();
+
+reg clk;
+reg reset;
+reg sensor_entrance1,sensor_entrance2;
+reg mode;
+reg [15:0] password_1,otp_1,car_no,data_car;
+reg [1:0] decision;
+wire gate_ent;
+wire green_led;
+wire red_led;
+
+// instatiate the main module
+main_2 d0 (.clk(clk),.reset(reset),.sensor_entrance1(sensor_entrance1),.sensor_entrance2(sensor_entrance2),.mode(mode),
+.password_1(password_1),.otp_1(otp_1),.decision(decision),.car_no(car_no),.data_car(data_car),.gate_ent(gate_ent),.green_led(green_led),.red_led(red_led));
+
+// Clock generation
+initial begin 
+    clk =0;
+    forever #5 clk=~clk; //5ns second clock period
+    end
+    
+// intialiase signals
+initial begin
+  reset=0;
+  mode=1;
+  decision=2'b00;
+  password_1=0;
+  otp_1=0;
+  car_no=0;
+  data_car=0;
+  sensor_entrance1=0;
+  sensor_entrance2=0;
+  end
+  
+  // write sensor signals
+ initial begin
+ 
+ #10 reset=0;
+ #10 reset=1;
+ #10 sensor_entrance1<=1;
+     sensor_entrance2<=0;
+
+// enterinng user input
+#30 password_1<=16'h2345;
+    otp_1<=16'h2345;
+#10
+$display("Time=%0t | UserInput=%0h | OTP=%0h | GateOpen=%b | ModeEntrance=%b", $time,password_1,otp_1,gate_ent,mode);
+
+ #100 sensor_entrance1<=0;
+     sensor_entrance2<=1; 
+ $display("Time=%0t | UserInput=%0h | OTP=%0h | GateOpen=%b | ModeEntrance=%b", $time,password_1,otp_1,gate_ent,mode);
+ 
+ #30 sensor_entrance1<=1;
+      sensor_entrance2<=0;
+ 
+     password_1<=16'h6784;
+     otp_1<=16'h6780;
+     
+ #20 $display("Time=%0t | UserInput=%0h | OTP=%0h | GateOpen=%b | ModeEntrance=%b", $time,password_1,otp_1,gate_ent,mode);
+     
+   
+      
+ #40
+ 
+    decision=2'b01;
+     password_1<=16'h6780;
+ #30 $display("Time=%0t | UserInput=%0h | OTP=%0h | GateOpen=%b | ModeEntrance=%b", $time,password_1,otp_1,gate_ent,mode);
+     sensor_entrance1<=0;
+      sensor_entrance2<=1;
+      
+ #10       sensor_entrance1<=1;
+           sensor_entrance2<=0; 
+ 
+       decision=2'b00;
+       password_1<=16'h5680;
+       otp_1 <=16'h5680;
+ #200
+    $display("Time=%0t | UserInput=%0h | OTP=%0h | GateOpen=%b | ModeEntrance=%b", $time,password_1,otp_1,gate_ent,mode);     
+         sensor_entrance1<=0;
+         sensor_entrance2<=1;
+    
+     
+ #10       sensor_entrance1<=1;
+              sensor_entrance2<=0;
+ 
+ decision =2'b10;
+  #30 $display("Time=%0t | UserInput=%0h | OTP=%0h | GateOpen=%b | ModeEntrance=%b", $time,password_1,otp_1,gate_ent,mode);     
+                sensor_entrance1<=0;
+                sensor_entrance2<=1;
+                
+ #10 decision=2'b00;
+     sensor_entrance1<=1;
+               sensor_entrance2<=0;
+                password_1<=16'h5450;
+                                    otp_1 <=16'h5450;
+    #100 $display("Time=%0t | UserInput=%0h | OTP=%0h | GateOpen=%b | ModeEntrance=%b", $time,password_1,otp_1,gate_ent,mode);            
+           sensor_entrance1<=0;
+           sensor_entrance2<=1;    
+ end
+ 
+  
+endmodule
